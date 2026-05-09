@@ -9,7 +9,12 @@ RUN pip install --no-cache-dir \
     psycopg2-binary \
     scikit-learn \
     transformers \
+    sentence-transformers \
     datasets \
+    pandas \
+    numpy \
+    matplotlib \
+    seaborn \
     pytest \
     dvc \
     dvc-s3 \

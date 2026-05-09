@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   postgres:
     image: postgres:14-alpine
@@ -24,6 +23,11 @@ services:
     command: server /data --console-address ":9001"
     ports: ["9000:9000", "9001:9001"]
     networks: [mlops-net]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   mlflow-web:
     build:
