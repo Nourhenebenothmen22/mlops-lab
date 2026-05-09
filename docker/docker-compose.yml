@@ -37,6 +37,7 @@ services:
       AWS_ACCESS_KEY_ID: mlflow
       AWS_SECRET_ACCESS_KEY: password
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      CUDA_VISIBLE_DEVICES: "-1"
     depends_on:
       postgres: {condition: service_healthy}
       minio: {condition: service_started}
@@ -60,9 +61,28 @@ services:
       AWS_ACCESS_KEY_ID: mlflow
       AWS_SECRET_ACCESS_KEY: password
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      CUDA_VISIBLE_DEVICES: "-1"
     volumes:
       - ../:/home/jovyan/work
     depends_on: [mlflow-web]
+    networks: [mlops-net]
+
+  ml-api:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.api
+    container_name: mlops-api
+    ports: ["8000:8000"]
+    environment:
+      CUDA_VISIBLE_DEVICES: "-1"
+      DATABASE_URL: postgresql://mlflow:mlflow@postgres:5432/mlflow
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     networks: [mlops-net]
 
 networks:

@@ -1,0 +1,36 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Enforce CPU-only environment
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV CUDA_VISIBLE_DEVICES=-1
+ENV TORCH_DEVICE=cpu
+
+# Install system dependencies for psycopg2 and build tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 1. Install CPU-only PyTorch first (critical for CPU-only environments)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# 2. Install remaining requirements
+# Note: we assume requirements.txt is in the same directory as the context (ml/)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 3. Copy the ML application code
+COPY . .
+
+# 4. Pre-download the SentenceTransformer model to avoid runtime downloads
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')"
+
+# Ensure the app can find the packages
+ENV PYTHONPATH=/app
+
+EXPOSE 8000
+
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

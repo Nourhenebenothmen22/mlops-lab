@@ -1,6 +1,7 @@
 FROM jupyter/minimal-notebook:latest
 
 USER root
+ENV CUDA_VISIBLE_DEVICES=-1
 
 RUN pip install --no-cache-dir \
     mlflow \
@@ -13,5 +14,8 @@ RUN pip install --no-cache-dir \
     dvc \
     dvc-s3 \
     torch --index-url https://download.pytorch.org/whl/cpu
+
+# Pre-download the model to the root user's cache, then move it if needed or just use it
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')"
 
 USER jovyan
