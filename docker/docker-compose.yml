@@ -44,7 +44,7 @@ services:
       CUDA_VISIBLE_DEVICES: "-1"
     depends_on:
       postgres: {condition: service_healthy}
-      minio: {condition: service_started}
+      minio: {condition: service_healthy}
     networks: [mlops-net]
     command: >
       mlflow server 
