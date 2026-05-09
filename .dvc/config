@@ -1,0 +1,7 @@
+[core]
+    remote = myremote
+['remote "myremote"']
+    url = s3://mlflow/dvcstore
+    endpointurl = http://localhost:9000
+    access_key_id = mlflow
+    secret_access_key = password
