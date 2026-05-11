@@ -1,0 +1,17 @@
+# Fichiers de cache et temporaires
+__pycache__/
+.venv/
+venv/
+.hf_cache/
+.dvc/cache/
+
+# Fichiers de configuration IDE
+.vscode/
+.idea/
+
+# Données brutes (on garde que le .dvc)
+data/raw/*.csv
+!data/raw/*.csv.dvc
+
+# Fichiers de build Docker
+.dockerignore
