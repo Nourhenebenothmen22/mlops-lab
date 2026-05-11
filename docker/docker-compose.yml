@@ -51,6 +51,7 @@ services:
       --backend-store-uri postgresql://mlflow:mlflow@postgres:5432/mlflow 
       --default-artifact-root s3://mlflow/artifacts 
       --host 0.0.0.0 --port 5000
+      --allowed-hosts "*"
 
   jupyter:
     build:
@@ -66,6 +67,7 @@ services:
       AWS_SECRET_ACCESS_KEY: password
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       CUDA_VISIBLE_DEVICES: "-1"
+      
     volumes:
       - ../:/home/jovyan/work
     depends_on: [mlflow-web]
