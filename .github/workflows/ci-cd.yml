@@ -1,41 +1,93 @@
-stages:
-  - setup
-  - test
-  - train
-  - deploy
+# Nom du pipeline qui apparaîtra sur GitHub
+name: MLOps CI/CD Pipeline
 
-variables:
-  MLFLOW_TRACKING_URI: "http://mlflow-web:5000"  # Adaptez si GitLab Runner est externe
-  AWS_ACCESS_KEY_ID: "mlflow"
-  AWS_SECRET_ACCESS_KEY: "password"
+# Déclencheur : se lance à chaque push sur la branche 'main' ou sur une Pull Request vers 'main'
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
-before_script:
-  - pip install -r requirements.txt
+# Liste des "Jobs" (les grandes étapes)
+jobs:
+  # PREMIER JOB : Tester le code
+  test:
+    name: 1 - Run Unit Tests
+    runs-on: ubuntu-latest  # Le job tourne sur une machine Linux fournie par GitHub
 
-test:
-  stage: test
-  script:
-    - pytest tests/ -v
-  only:
-    - merge_requests
-    - main
+    steps:
+      # Étape 1 : Récupérer le code de ton repo
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-train:
-  stage: train
-  script:
-    - dvc pull  # Récupère les données versionnées
-    - python src/train.py  # Script production-ready
-  artifacts:
-    reports:
-      metrics: metrics.txt  # Si vous exportez des métriques pour GitLab
-  only:
-    - main
+      # Étape 2 : Configurer Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-deploy:
-  stage: deploy
-  script:
-    - echo "Déploiement du modèle via MLflow"
-    - python src/deploy.py  # Script qui pull le modèle @production et build l'API
-  only:
-    - main
-  when: manual  # Déclenchement manuel pour la prod
+      # Étape 3 : Installer les dépendances listées dans requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      # Étape 4 : Lancer les tests avec pytest
+      - name: Run Pytest
+        run: pytest tests/
+
+  # DEUXIÈME JOB : Entraîner le modèle
+  train:
+    name: 2 - Train Model
+    # 'needs' force ce job à attendre que le job 'test' ait réussi
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          # On a besoin de l'historique Git complet pour que DVC fonctionne
+          fetch-depth: 0 
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Étape DVC : Tenter de récupérer les données (on s'attend à ce que ça échoue)
+      - name: DVC - Pull data
+        run: dvc pull -r myremote || echo "DVC pull failed as expected (no access to local remote), continuing..."
+        env:
+          # On simule les accès, même si ça ne marchera pas sur le runner distant
+          AWS_ACCESS_KEY_ID: "fake-key"
+          AWS_SECRET_ACCESS_KEY: "fake-secret"
+
+      # Étape d'entraînement : Lancer le script python
+      - name: Run training script
+        run: python src/train.py
+        env:
+          # On passe l'URI de ton serveur MLflow local (le script va essayer de se connecter et échouer)
+          MLFLOW_TRACKING_URI: "http://localhost:5000"
+
+  # TROISIÈME JOB : Déployer (simulé)
+  deploy:
+    name: 3 - Deploy Model
+    needs: train # Attend que l'entraînement soit terminé
+    
+    # "when: manual" de GitLab est simulé ici par "environment" et "if"
+    # Il faudra cliquer sur "Review deployments" dans l'UI GitHub pour approuver
+    environment: production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Simulate Deployment'
+        run: |
+          echo "🚀 Simulating deployment to production..."
+          echo "✅ Model would be deployed here."
