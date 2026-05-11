@@ -1,45 +1,47 @@
-# Nom du pipeline qui apparaîtra sur GitHub
 name: MLOps CI/CD Pipeline
 
-# Déclencheur : se lance à chaque push sur la branche 'main' ou sur une Pull Request vers 'main'
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
 
-# Liste des "Jobs" (les grandes étapes)
 jobs:
-  # PREMIER JOB : Tester le code
   test:
     name: 1 - Run Unit Tests
-    runs-on: ubuntu-latest  # Le job tourne sur une machine Linux fournie par GitHub
+    runs-on: ubuntu-latest
 
     steps:
-      # Étape 1 : Récupérer le code de ton repo
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Étape 2 : Configurer Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      # Étape 3 : Installer les dépendances listées dans requirements.txt
+      # --- DÉBUT DE LA CORRECTION ---
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          # Le dossier où pip stocke les téléchargements
+          path: ~/.cache/pip
+          # Une clé unique pour ce cache. Si requirements.txt change, la clé change.
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      # --- FIN DE LA CORRECTION ---
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
-      # Étape 4 : Lancer les tests avec pytest
       - name: Run Pytest
         run: pytest tests/
 
-  # DEUXIÈME JOB : Entraîner le modèle
   train:
     name: 2 - Train Model
-    # 'needs' force ce job à attendre que le job 'test' ait réussi
     needs: test
     runs-on: ubuntu-latest
 
@@ -47,7 +49,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          # On a besoin de l'historique Git complet pour que DVC fonctionne
           fetch-depth: 0 
 
       - name: Set up Python
@@ -55,36 +56,38 @@ jobs:
         with:
           python-version: '3.9'
 
+      # --- ON AJOUTE LE CACHE ICI AUSSI ---
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      # --- FIN DE LA CORRECTION ---
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Étape DVC : Tenter de récupérer les données (on s'attend à ce que ça échoue)
       - name: DVC - Pull data
         run: dvc pull -r myremote || echo "DVC pull failed as expected (no access to local remote), continuing..."
         env:
-          # On simule les accès, même si ça ne marchera pas sur le runner distant
           AWS_ACCESS_KEY_ID: "fake-key"
           AWS_SECRET_ACCESS_KEY: "fake-secret"
 
-      # Étape d'entraînement : Lancer le script python
       - name: Run training script
         run: python src/train.py
         env:
-          # On passe l'URI de ton serveur MLflow local (le script va essayer de se connecter et échouer)
           MLFLOW_TRACKING_URI: "http://localhost:5000"
 
-  # TROISIÈME JOB : Déployer (simulé)
+  # Le job de déploiement n'a pas besoin d'installer de dépendances, donc pas de cache nécessaire ici
   deploy:
     name: 3 - Deploy Model
-    needs: train # Attend que l'entraînement soit terminé
-    
-    # "when: manual" de GitLab est simulé ici par "environment" et "if"
-    # Il faudra cliquer sur "Review deployments" dans l'UI GitHub pour approuver
+    needs: train
     environment: production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
     runs-on: ubuntu-latest
     steps:
       - name: 'Simulate Deployment'
