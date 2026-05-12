@@ -1,14 +1,19 @@
 name: Test Discord
+
 on: [push]
+
+env:
+  AUTHOR: "Nourhene Ben othmen 2ING DS-AI 2.2"
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Test Webhook
+      - name: Test Webhook Discord
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
           curl -X POST \
             -H "Content-Type: application/json" \
-            -d '{"content":"🧪 Test de connexion depuis GitHub Actions"}' \
+            -d "{\"username\":\"${{ env.AUTHOR }}\",\"content\":\"🧪 **Test de Webhook**\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"✅ Statut\",\"value\":\"Le changement de nom fonctionne !\",\"inline\":true}]}]}" \
             "$DISCORD_WEBHOOK"

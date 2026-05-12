@@ -1,0 +1,7 @@
+{
+  "r2_score": 0.4082,
+  "model_type": "RandomForestRegressor",
+  "run_id": "941b37f27ab04066a7b8cd2b8abde627",
+  "mlflow_link": "http://mlflow-web:5000/#/experiments/0/runs/941b37f27ab04066a7b8cd2b8abde627",
+  "author": "Nourhene Ben othmen 2ING DS-AI 2.2"
+}
