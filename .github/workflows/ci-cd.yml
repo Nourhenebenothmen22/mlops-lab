@@ -36,6 +36,7 @@ jobs:
           pip install -r requirements.txt
       
       - name: Run Pytest
+        id: pytest
         run: |
           if [ -d "tests" ] && [ -n "$(ls -A tests/*.py 2>/dev/null)" ]; then
             pytest tests/
@@ -45,6 +46,26 @@ jobs:
             echo "def test_placeholder(): pass" > tests/test_placeholder.py
             pytest tests/
           fi
+
+      - name: Notify Discord - Tests Success
+        if: success() && github.event_name == 'push'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"content":"✅ **Tests Unités** - Succès sur `${{ github.ref_name }}`","embeds":[{"color":3066993,"fields":[{"name":"Commit","value":"`${{ github.sha }}`","inline":false},{"name":"Auteur","value":"${{ github.actor }}","inline":true}]}]}' \
+            $DISCORD_WEBHOOK
+
+      - name: Notify Discord - Tests Failed
+        if: failure() && github.event_name == 'push'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"content":"❌ **Tests Unités** - Échec sur `${{ github.ref_name }}` !","embeds":[{"color":15158332,"fields":[{"name":"Commit","value":"`${{ github.sha }}`","inline":false},{"name":"Auteur","value":"${{ github.actor }}","inline":true},{"name":"Action","value":"Vérifiez les logs","inline":true}]}]}' \
+            $DISCORD_WEBHOOK
 
   train:
     name: 2 - Train Model
@@ -94,7 +115,6 @@ jobs:
       - name: Create fallback data for CI
         run: |
           mkdir -p data/raw
-          # Création d'un dataset minimal (ajustez les colonnes selon votre vrai dataset diabetes)
           cat > data/raw/diabetes.csv << 'EOF'
           Pregnancies,Glucose,BloodPressure,SkinThickness,Insulin,BMI,DiabetesPedigreeFunction,Age,Outcome
           6,148,72,35,0,33.6,0.627,50,1
@@ -111,17 +131,12 @@ jobs:
 
       - name: Patch train.py for CI (bypass DVC)
         run: |
-          # Remplace la ligne DVC par une lecture directe du fichier local
-          # Note: Ajustez le pattern sed si votre ligne est différente
           sed -i 's|data_path = dvc.api.get_url(path=['\"'\"']data/raw/diabetes.csv['\"'\"'], repo=['\"'\"'].['\"'\"'])|data_path = \"data/raw/diabetes.csv\"|' src/train.py
-          
-          # Alternative si le pattern ci-dessus ne marche pas (plus robuste):
-          # sed -i 's|dvc.api.get_url.*|\"data/raw/diabetes.csv\"|' src/train.py
-          
           echo "Vérification du fichier modifié:"
           grep -n "data_path" src/train.py || echo "data_path non trouvé, vérifiez votre script"
 
       - name: Run training script
+        id: training
         run: python src/train.py
         env:
           MLFLOW_TRACKING_URI: "file:///tmp/mlruns"
@@ -133,6 +148,26 @@ jobs:
           path: /tmp/mlruns
           retention-days: 5
 
+      - name: Notify Discord - Training Success
+        if: success() && github.event_name == 'push'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"content":"🚀 **Entraînement** - Modèle entraîné avec succès sur `${{ github.ref_name }}` !","embeds":[{"color":3066993,"description":"Le modèle est disponible dans les artefacts MLflow","fields":[{"name":"DVC Status","value":"${{ steps.dvc_pull.outcome == '\''success'\'' && '✅ Données DVC' || '⚠️ Fallback local' }}","inline":true}]}]}' \
+            $DISCORD_WEBHOOK
+
+      - name: Notify Discord - Training Failed
+        if: failure() && github.event_name == 'push'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"content":"💥 **Entraînement** - Échec sur `${{ github.ref_name }}` !","embeds":[{"color":15158332,"description":"L'\''entraînement a échoué","fields":[{"name":"Erreur","value":"Vérifiez l'\''étape 'Run training script'","inline":true}]}]}' \
+            $DISCORD_WEBHOOK
+
   deploy:
     name: 3 - Deploy Model
     needs: train
@@ -140,8 +175,37 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    
     steps:
-      - name: 'Simulate Deployment'
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: training-artifacts
+          path: ./artifacts
+
+      - name: Simulate Deployment
+        id: deploy
         run: |
           echo "🚀 Simulating deployment to production..."
+          ls -la ./artifacts/ || echo "No artifacts found"
           echo "✅ Model would be deployed here."
+
+      - name: Notify Discord - Deployment Success
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"content":"🎉 **Déploiement** - Production mise à jour sur `${{ github.ref_name }}` !","embeds":[{"color":3066993,"fields":[{"name":"Commit","value":"`${{ github.sha }}`","inline":true},{"name":"Status","value":"✅ Déployé","inline":true}]}]}' \
+            $DISCORD_WEBHOOK
+
+      - name: Notify Discord - Deployment Failed
+        if: failure()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"content":"🚨 **Déploiement** - Échec en production !","embeds":[{"color":15158332,"description":"Le déploiement a échoué","fields":[{"name":"Commit","value":"`${{ github.sha }}`","inline":true}]}]}' \
+            $DISCORD_WEBHOOK
