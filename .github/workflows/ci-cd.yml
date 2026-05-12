@@ -30,9 +30,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-v11-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-v12-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-v11-
+            ${{ runner.os }}-pip-v12-
 
       - name: ⬇️ Install dependencies
         run: |
@@ -41,12 +41,7 @@ jobs:
       
       - name: 🧪 Run Pytest
         id: pytest
-        run: |
-          mkdir -p tests
-          if [ ! -f "tests/test_basic.py" ]; then
-            echo "def test_placeholder(): assert True" > tests/test_basic.py
-          fi
-          pytest tests/ -v
+        run: pytest tests/ -v
 
       - name: 📢 Notify Discord - Tests Success
         if: always() && github.event_name == 'push' && success()
@@ -91,7 +86,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-v11-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-v12-${{ hashFiles('**/requirements.txt') }}
 
       - name: ⬇️ Install dependencies
         run: |
@@ -116,7 +111,7 @@ jobs:
         run: python src/train.py
         env:
           CI: "true"
-          MLFLOW_TRACKING_URI: "sqlite:///mlflow.db"
+          MLFLOW_TRACKING_URI: "file:///tmp/mlruns"
 
       - name: 📊 Extract Metrics
         id: metrics
@@ -140,7 +135,7 @@ jobs:
         with:
           name: mlflow-artifacts-Nourhene-Ben-othmen
           path: |
-            mlflow.db
+            /tmp/mlruns
             metrics.json
           retention-days: 7
 

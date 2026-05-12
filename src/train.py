@@ -1,12 +1,17 @@
 import json
 import logging
 import os
+import warnings
 import mlflow
 import mlflow.sklearn
 import pandas as pd
 from sklearn.datasets import load_diabetes
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+
+# Masquer les avertissements de dépréciation MLflow pour des logs CI propres
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,10 +36,8 @@ def load_data():
 
 
 def main():
-    # Utilisation de SQLite pour éviter les warnings de dépréciation MLflow
-    tracking_uri = os.getenv(
-        "MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"
-    )
+    # Backend de stockage local (le plus stable pour GitHub Actions)
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "file:///tmp/mlruns")
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.sklearn.autolog()
 
@@ -55,12 +58,11 @@ def main():
         logger.info(f"R2 Score: {score}")
         mlflow.log_metric("r2_score", score)
 
-        # Récupération des infos MLflow
         run_id = run.info.run_id
         exp_id = run.info.experiment_id
         mlflow_link = f"http://mlflow-web:5000/#/experiments/{exp_id}/runs/{run_id}"
 
-        # ✅ CRÉATION DU FICHIER METRICS.JSON (INDISPENSABLE POUR DISCORD)
+        # ✅ CRÉATION OBLIGATOIRE DU FICHIER METRICS.JSON
         metrics = {
             "r2_score": round(float(score), 4),
             "model_type": "RandomForestRegressor",
@@ -72,7 +74,7 @@ def main():
         with open("metrics.json", "w") as f:
             json.dump(metrics, f, indent=2)
 
-        logger.info("✅ Fichier metrics.json créé avec succès !")
+        logger.info(f"✅ Fichier metrics.json généré avec succès : {metrics}")
 
 
 if __name__ == "__main__":
