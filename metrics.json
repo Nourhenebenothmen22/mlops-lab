@@ -1,7 +1,15 @@
 {
-  "r2_score": 0.4082,
-  "model_type": "RandomForestRegressor",
-  "run_id": "fd835702a53d4ee98cc7eca2fa1139bd",
-  "mlflow_link": "http://mlflow-web:5000/#/experiments/0/runs/fd835702a53d4ee98cc7eca2fa1139bd",
+  "tabular_model": "DiabetesModel",
+  "tabular_run_name": "rf_v1",
+  "r2_score": 0.4566,
+  "tabular_preds": [
+    153.82,
+    168.4,
+    153.03
+  ],
+  "tabular_link": "http://mlflow-web:5000/#/experiments/189991462698496633/runs/4162cc776303415da47a297286a8c3c0",
+  "nlp_model": "DistilBERT_Sentiment",
+  "nlp_run_name": "distilbert_sentiment_v1",
+  "nlp_status": "Enregistr\u00e9 avec succ\u00e8s",
   "author": "Nourhene Ben othmen 2ING DS-AI 2.2"
 }

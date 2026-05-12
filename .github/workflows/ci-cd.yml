@@ -30,9 +30,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-v12-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-v16-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-v12-
+            ${{ runner.os }}-pip-v16-
 
       - name: ⬇️ Install dependencies
         run: |
@@ -66,7 +66,7 @@ jobs:
           fi
 
   train:
-    name: 2️⃣ Entraînement Modèle - Nourhene Ben othmen 2ING DS-AI 2.2
+    name: 2️⃣ Entraînement & Registry - Nourhene Ben othmen 2ING DS-AI 2.2
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -86,12 +86,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-v12-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-v16-${{ hashFiles('**/requirements.txt') }}
 
       - name: ⬇️ Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install transformers>=4.30.0
 
       - name: 🔧 Setup Git
         run: |
@@ -106,51 +107,64 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID || 'fake-key' }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || 'fake-secret' }}
 
-      - name: 🎯 Run Training Script
+      - name: 🎯 Run Full Multi-Model Script
         id: training
         run: python src/train.py
         env:
           CI: "true"
           MLFLOW_TRACKING_URI: "file:///tmp/mlruns"
 
-      - name: 📊 Extract Metrics
+      - name: 📊 Extract Multi-Model Metrics
         id: metrics
         if: success()
         run: |
           if [ -f metrics.json ]; then
+            TAB_MOD=$(jq -r '.tabular_model' metrics.json)
+            TAB_RUN=$(jq -r '.tabular_run_name' metrics.json)
             R2=$(jq -r '.r2_score' metrics.json)
-            MODEL=$(jq -r '.model_type' metrics.json)
-            LINK=$(jq -r '.mlflow_link' metrics.json)
-            echo "r2_score=$R2" >> $GITHUB_OUTPUT
-            echo "model=$MODEL" >> $GITHUB_OUTPUT
+            PREDS=$(jq -c '.tabular_preds' metrics.json)
+            LINK=$(jq -r '.tabular_link' metrics.json)
+            
+            NLP_MOD=$(jq -r '.nlp_model' metrics.json)
+            NLP_RUN=$(jq -r '.nlp_run_name' metrics.json)
+            NLP_STAT=$(jq -r '.nlp_status' metrics.json)
+            
+            echo "tab_mod=$TAB_MOD" >> $GITHUB_OUTPUT
+            echo "tab_run=$TAB_RUN" >> $GITHUB_OUTPUT
+            echo "r2=$R2" >> $GITHUB_OUTPUT
+            echo "preds=$PREDS" >> $GITHUB_OUTPUT
             echo "link=$LINK" >> $GITHUB_OUTPUT
-          else
-            echo "r2_score=N/A" >> $GITHUB_OUTPUT
-            echo "model=Unknown" >> $GITHUB_OUTPUT
-            echo "link=http://mlflow-web:5000" >> $GITHUB_OUTPUT
+            echo "nlp_mod=$NLP_MOD" >> $GITHUB_OUTPUT
+            echo "nlp_run=$NLP_RUN" >> $GITHUB_OUTPUT
+            echo "nlp_stat=$NLP_STAT" >> $GITHUB_OUTPUT
           fi
 
-      - name: 📤 Upload Artifacts
+      - name: 📤 Upload MLflow Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mlflow-artifacts-Nourhene-Ben-othmen
+          name: mlflow-dual-registry-Nourhene-Ben-othmen
           path: |
             /tmp/mlruns
             metrics.json
           retention-days: 7
 
-      - name: 📢 Notify Discord - Training Success
+      - name: 📢 Notify Discord - Dual Training Success
         if: always() && github.event_name == 'push' && success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          R2: ${{ steps.metrics.outputs.r2_score }}
-          MODEL: ${{ steps.metrics.outputs.model }}
+          TAB_MOD: ${{ steps.metrics.outputs.tab_mod }}
+          TAB_RUN: ${{ steps.metrics.outputs.tab_run }}
+          R2: ${{ steps.metrics.outputs.r2 }}
+          PREDS: ${{ steps.metrics.outputs.preds }}
           LINK: ${{ steps.metrics.outputs.link }}
+          NLP_MOD: ${{ steps.metrics.outputs.nlp_mod }}
+          NLP_RUN: ${{ steps.metrics.outputs.nlp_run }}
+          NLP_STAT: ${{ steps.metrics.outputs.nlp_stat }}
         run: |
           if [ -n "$DISCORD_WEBHOOK" ]; then
             DVC_STATUS="${{ steps.dvc_pull.outcome == 'success' && 'DVC S3' || 'Sklearn Fallback' }}"
             curl -X POST -H "Content-Type: application/json" \
-              -d "{\"username\":\"${{ env.AUTHOR }}\",\"content\":\"🚀 **${{ env.AUTHOR }}** | Stage 2/3: Entraînement Terminé\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"🎯 R² Score\",\"value\":\"$R2\",\"inline\":true},{\"name\":\"🤖 Modèle\",\"value\":\"$MODEL\",\"inline\":true},{\"name\":\"💾 Source\",\"value\":\"$DVC_STATUS\",\"inline\":true},{\"name\":\"🔗 MLflow Run\",\"value\":\"[Voir sur MLflow]($LINK)\",\"inline\":false}]}]}" \
+              -d "{\"username\":\"${{ env.AUTHOR }}\",\"content\":\"🚀 **${{ env.AUTHOR }}** | Stage 2/3: Double Entraînement MLflow Réussi\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"📊 Modèle Tabulaire\",\"value\":\"**$TAB_MOD** (\`$TAB_RUN\`)\\n🎯 R² Score : \`$R2\`\\n🔮 Prédictions : \`$PREDS\`\",\"inline\":true},{\"name\":\"🧠 Modèle NLP (HuggingFace)\",\"value\":\"**$NLP_MOD** (\`$NLP_RUN\`)\\n✅ Statut : \`$NLP_STAT\`\",\"inline\":true},{\"name\":\"💾 Source Données\",\"value\":\"$DVC_STATUS\",\"inline\":false},{\"name\":\"🔗 MLflow Tracking\",\"value\":\"[Inspecter le Run Tabulaire sur MLflow]($LINK)\",\"inline\":false}]}]}" \
               "$DISCORD_WEBHOOK"
           fi
 
@@ -161,7 +175,7 @@ jobs:
         run: |
           if [ -n "$DISCORD_WEBHOOK" ]; then
             curl -X POST -H "Content-Type: application/json" \
-              -d "{\"username\":\"${{ env.AUTHOR }}\",\"content\":\"💥 **${{ env.AUTHOR }}** | Stage 2/3: Entraînement Échoué\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"❌ Erreur\",\"value\":\"Échec de l'entraînement\",\"inline\":false}]}]}" \
+              -d "{\"username\":\"${{ env.AUTHOR }}\",\"content\":\"💥 **${{ env.AUTHOR }}** | Stage 2/3: Échec Entraînement\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"❌ Erreur\",\"value\":\"Vérifier les logs de l'étape 'Run Full Multi-Model Script'\",\"inline\":false}]}]}" \
               "$DISCORD_WEBHOOK"
           fi
 
@@ -177,11 +191,11 @@ jobs:
       - name: 📥 Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: mlflow-artifacts-Nourhene-Ben-othmen
+          name: mlflow-dual-registry-Nourhene-Ben-othmen
           path: ./artifacts
 
       - name: 🚀 Simulate Deployment
-        run: echo "✅ Déploiement simulé avec succès par Nourhene Ben othmen"
+        run: echo "✅ Modèles DiabetesModel (@production) et DistilBERT_Sentiment déployés avec succès"
 
       - name: 📢 Notify Discord - Deployment Success
         if: always() && success()
@@ -190,6 +204,6 @@ jobs:
         run: |
           if [ -n "$DISCORD_WEBHOOK" ]; then
             curl -X POST -H "Content-Type: application/json" \
-              -d "{\"username\":\"${{ env.AUTHOR }}\",\"content\":\"🎉 **${{ env.AUTHOR }}** | Stage 3/3: Déploiement Réussi\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"🌐 Env\",\"value\":\"Production\",\"inline\":true},{\"name\":\"✅ Status\",\"value\":\"Déployé\",\"inline\":true}]}]}" \
+              -d "{\"username\":\"${{ env.AUTHOR }}\",\"content\":\"🎉 **${{ env.AUTHOR }}** | Stage 3/3: Déploiement Production Réussi\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"🚀 Modèles Déployés\",\"value\":\"\`DiabetesModel\` (@production)\\n\`DistilBERT_Sentiment\` (NLP)\",\"inline\":false},{\"name\":\"🌐 Env\",\"value\":\"Production\",\"inline\":true},{\"name\":\"✅ Status\",\"value\":\"Actif\",\"inline\":true}]}]}" \
               "$DISCORD_WEBHOOK"
           fi
