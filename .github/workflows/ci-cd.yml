@@ -1,4 +1,4 @@
-name: MLOps CI/CD Pipeline
+name: MLOps CI/CD Pipeline - Nourhene ben Othmen 2ING DS-IA 2.2
 
 on:
   push:
@@ -7,37 +7,37 @@ on:
     branches: [ main ]
 
 env:
-  AUTHOR: "Nourhene Ben othmen 2ING DS-AI 2.2"
+  AUTHOR: "Nourhene ben Othmen 2ING DS-IA 2.2"
 
 jobs:
   test:
-    name: 1 - Run Unit Tests
+    name: 1 - Tests Unités - Nourhene ben Othmen 2ING DS-IA 2.2
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      - name: Checkout repository
+      - name: 📥 Checkout - Nourhene ben Othmen 2ING DS-IA 2.2
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 🐍 Setup Python 3.9 - Nourhene ben Othmen 2ING DS-IA 2.2
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
-      - name: Cache pip dependencies
+      - name: 📦 Cache pip - Nourhene ben Othmen 2ING DS-IA 2.2
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-v6-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-v7-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-v6-
+            ${{ runner.os }}-pip-v7-
 
-      - name: Install dependencies
+      - name: ⬇️ Install dependencies - Nourhene ben Othmen 2ING DS-IA 2.2
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
-      - name: Run Pytest
+      - name: 🧪 Run Pytest - Nourhene ben Othmen 2ING DS-IA 2.2
         id: pytest
         run: |
           mkdir -p tests
@@ -46,7 +46,7 @@ jobs:
           fi
           pytest tests/ -v
 
-      - name: Check Discord Secret
+      - name: 🔍 Check Discord Config - Nourhene ben Othmen 2ING DS-IA 2.2
         run: |
           if [ -z "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
             echo "⚠️ Secret DISCORD_WEBHOOK_URL non configuré!"
@@ -54,7 +54,7 @@ jobs:
             echo "✅ Secret Discord configuré"
           fi
 
-      - name: Notify Discord - Tests Success
+      - name: 📢 Notify Discord - Tests Success - Nourhene ben Othmen 2ING DS-IA 2.2
         if: always() && github.event_name == 'push' && success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -62,11 +62,11 @@ jobs:
           if [ -n "$DISCORD_WEBHOOK" ]; then
             curl -X POST \
               -H "Content-Type: application/json" \
-              -d "{\"content\":\"✅ **Stage 1/3: Tests Unités** - Validation réussie\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"🌿 Branch\",\"value\":\"${{ github.ref_name }}\",\"inline\":true},{\"name\":\"📌 Commit\",\"value\":\"${{ github.sha }}\",\"inline\":false}]}]}" \
+              -d "{\"content\":\"✅ **Stage 1/3: Tests Unités**\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"🌿 Branch\",\"value\":\"${{ github.ref_name }}\",\"inline\":true},{\"name\":\"📌 Commit\",\"value\":\"${{ github.sha }}\",\"inline\":false},{\"name\":\"✅ Résultat\",\"value\":\"Tous les tests passent\",\"inline\":true}]}]}" \
               "$DISCORD_WEBHOOK"
           fi
 
-      - name: Notify Discord - Tests Failed
+      - name: 📢 Notify Discord - Tests Failed - Nourhene ben Othmen 2ING DS-IA 2.2
         if: always() && github.event_name == 'push' && failure()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -74,89 +74,98 @@ jobs:
           if [ -n "$DISCORD_WEBHOOK" ]; then
             curl -X POST \
               -H "Content-Type: application/json" \
-              -d "{\"content\":\"❌ **Stage 1/3: Tests Unités** - Échec\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"⚠️ Action\",\"value\":\"Vérifier les logs pytest\",\"inline\":true}]}]}" \
+              -d "{\"content\":\"❌ **Stage 1/3: Tests Unités**\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"❌ Résultat\",\"value\":\"Échec des tests\",\"inline\":true},{\"name\":\"🔍 Action\",\"value\":\"Vérifier les logs pytest\",\"inline\":false}]}]}" \
               "$DISCORD_WEBHOOK"
           fi
 
   train:
-    name: 2 - Train Model
+    name: 2 - Entraînement Modèle - Nourhene ben Othmen 2ING DS-IA 2.2
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
-      - name: Checkout repository
+      - name: 📥 Checkout - Nourhene ben Othmen 2ING DS-IA 2.2
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 
 
-      - name: Set up Python
+      - name: 🐍 Setup Python 3.9 - Nourhene ben Othmen 2ING DS-IA 2.2
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
-      - name: Cache pip dependencies
+      - name: 📦 Cache pip - Nourhene ben Othmen 2ING DS-IA 2.2
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-v6-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-v7-${{ hashFiles('**/requirements.txt') }}
 
-      - name: Install dependencies
+      - name: ⬇️ Install dependencies - Nourhene ben Othmen 2ING DS-IA 2.2
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Setup Git
+      - name: 🔧 Setup Git - Nourhene ben Othmen 2ING DS-IA 2.2
         run: |
           git config --global user.email "ci@github.com"
           git config --global user.name "GitHub Actions"
 
-      - name: Try DVC Pull (optional)
+      - name: 💾 Try DVC Pull - Nourhene ben Othmen 2ING DS-IA 2.2
         id: dvc_pull
         continue-on-error: true
         run: |
-          timeout 60 dvc pull -r myremote || echo "⚠️ DVC pull failed"
+          timeout 60 dvc pull -r myremote || echo "⚠️ DVC pull failed - using sklearn fallback"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID || 'fake-key' }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || 'fake-secret' }}
 
-      - name: Determine Data Source
-        id: data_source
-        run: |
-          if [ "${{ steps.dvc_pull.outcome }}" == "success" ]; then
-            echo "source=DVC S3 ✅" >> $GITHUB_OUTPUT
-          else
-            echo "source=Sklearn Fallback (CI) ⚠️" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run training script
+      - name: 🎯 Run Training Script - Nourhene ben Othmen 2ING DS-IA 2.2
         id: training
         run: python src/train.py
         env:
           CI: "true"
           MLFLOW_TRACKING_URI: "file:///tmp/mlruns"
 
-      - name: Upload artifacts
+      - name: 📊 Extract Metrics - Nourhene ben Othmen 2ING DS-IA 2.2
+        id: metrics
+        if: success()
+        run: |
+          if [ -f metrics.json ]; then
+            R2=$(jq -r '.r2_score' metrics.json)
+            MODEL=$(jq -r '.model_type' metrics.json)
+            echo "r2_score=$R2" >> $GITHUB_OUTPUT
+            echo "model=$MODEL" >> $GITHUB_OUTPUT
+            echo "✅ Métriques extraites: R²=$R2, Model=$MODEL"
+          else
+            echo "r2_score=N/A" >> $GITHUB_OUTPUT
+            echo "model=Unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📤 Upload Artifacts (MLflow) - Nourhene ben Othmen 2ING DS-IA 2.2
         uses: actions/upload-artifact@v4
         with:
-          name: training-artifacts
-          path: /tmp/mlruns
-          retention-days: 5
+          name: mlflow-training-artifacts
+          path: |
+            /tmp/mlruns
+            metrics.json
+          retention-days: 7
 
-      - name: Notify Discord - Training Success
+      - name: 📢 Notify Discord - Training Success - Nourhene ben Othmen 2ING DS-IA 2.2
         if: always() && github.event_name == 'push' && success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          DATA_SRC: ${{ steps.data_source.outputs.source }}
+          R2_SCORE: ${{ steps.metrics.outputs.r2_score }}
+          MODEL_TYPE: ${{ steps.metrics.outputs.model }}
         run: |
           if [ -n "$DISCORD_WEBHOOK" ]; then
             curl -X POST \
               -H "Content-Type: application/json" \
-              -d "{\"content\":\"🚀 **Stage 2/3: Entraînement** - Modèle entraîné\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"💾 Source\",\"value\":\"$DATA_SRC\",\"inline\":true},{\"name\":\"📁 Artifacts\",\"value\":\"Disponibles dans MLflow\",\"inline\":false}]}]}" \
+              -d "{\"content\":\"🚀 **Stage 2/3: Entraînement Terminé**\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"🎯 R² Score\",\"value\":\"$R2_SCORE\",\"inline\":true},{\"name\":\"🤖 Modèle\",\"value\":\"$MODEL_TYPE\",\"inline\":true},{\"name\":\"💾 Source Données\",\"value\":\"${{ steps.dvc_pull.outcome == 'success' && 'DVC S3' || 'Sklearn Fallback (CI)' }}\",\"inline\":true},{\"name\":\"📁 Artefacts MLflow\",\"value\":\"Disponibles dans la section Artifacts du workflow\",\"inline\":false}]}]}" \
               "$DISCORD_WEBHOOK"
           fi
 
-      - name: Notify Discord - Training Failed
+      - name: 📢 Notify Discord - Training Failed - Nourhene ben Othmen 2ING DS-IA 2.2
         if: always() && github.event_name == 'push' && failure()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -164,12 +173,12 @@ jobs:
           if [ -n "$DISCORD_WEBHOOK" ]; then
             curl -X POST \
               -H "Content-Type: application/json" \
-              -d "{\"content\":\"💥 **Stage 2/3: Entraînement** - Échec\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"❌ Erreur\",\"value\":\"Échec lors de l'entraînement\",\"inline\":true}]}]}" \
+              -d "{\"content\":\"💥 **Stage 2/3: Entraînement Échoué**\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"❌ Erreur\",\"value\":\"Échec lors de l'entraînement\",\"inline\":true},{\"name\":\"🔍 Logs\",\"value\":\"Vérifier l'étape 'Run Training Script'\",\"inline\":false}]}]}" \
               "$DISCORD_WEBHOOK"
           fi
 
   deploy:
-    name: 3 - Deploy Model
+    name: 3 - Déploiement Production - Nourhene ben Othmen 2ING DS-IA 2.2
     needs: train
     environment: production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -177,18 +186,22 @@ jobs:
     timeout-minutes: 5
     
     steps:
-      - name: Download artifacts
+      - name: 📥 Download Artifacts - Nourhene ben Othmen 2ING DS-IA 2.2
         uses: actions/download-artifact@v4
         with:
-          name: training-artifacts
+          name: mlflow-training-artifacts
           path: ./artifacts
 
-      - name: Simulate Deployment
+      - name: 🚀 Simulate Deployment - Nourhene ben Othmen 2ING DS-IA 2.2
         run: |
-          echo "🚀 Déploiement en production..."
+          echo "🚀 Déploiement du modèle en production..."
+          if [ -f ./artifacts/metrics.json ]; then
+            R2=$(jq -r '.r2_score' ./artifacts/metrics.json)
+            echo "📊 Modèle déployé avec R²: $R2"
+          fi
           echo "✅ Déploiement simulé avec succès"
 
-      - name: Notify Discord - Deployment Success
+      - name: 📢 Notify Discord - Deployment Success - Nourhene ben Othmen 2ING DS-IA 2.2
         if: always() && success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -196,11 +209,11 @@ jobs:
           if [ -n "$DISCORD_WEBHOOK" ]; then
             curl -X POST \
               -H "Content-Type: application/json" \
-              -d "{\"content\":\"🎉 **Stage 3/3: Déploiement** - Production mise à jour\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"🌐 Environnement\",\"value\":\"Production\",\"inline\":true},{\"name\":\"✅ Status\",\"value\":\"Déployé avec succès\",\"inline\":true},{\"name\":\"📌 Commit\",\"value\":\"${{ github.sha }}\",\"inline\":false}]}]}" \
+              -d "{\"content\":\"🎉 **Stage 3/3: Déploiement Production**\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"🌐 Environnement\",\"value\":\"Production\",\"inline\":true},{\"name\":\"✅ Status\",\"value\":\"Déployé avec succès\",\"inline\":true},{\"name\":\"📌 Commit\",\"value\":\"${{ github.sha }}\",\"inline\":false}]}]}" \
               "$DISCORD_WEBHOOK"
           fi
 
-      - name: Notify Discord - Deployment Failed
+      - name: 📢 Notify Discord - Deployment Failed - Nourhene ben Othmen 2ING DS-IA 2.2
         if: always() && failure()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
@@ -208,6 +221,6 @@ jobs:
           if [ -n "$DISCORD_WEBHOOK" ]; then
             curl -X POST \
               -H "Content-Type: application/json" \
-              -d "{\"content\":\"🚨 **Stage 3/3: Déploiement** - Échec en production\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"⚠️ Statut\",\"value\":\"Échec critique\",\"inline\":true},{\"name\":\"🔧 Action\",\"value\":\"Intervention immédiate requise\",\"inline\":false}]}]}" \
+              -d "{\"content\":\"🚨 **Stage 3/3: Déploiement Échoué**\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"⚠️ Statut\",\"value\":\"Échec critique\",\"inline\":true},{\"name\":\"🔧 Action\",\"value\":\"Intervention immédiate requise\",\"inline\":false}]}]}" \
               "$DISCORD_WEBHOOK"
           fi
