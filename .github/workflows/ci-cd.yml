@@ -10,6 +10,7 @@ jobs:
   test:
     name: 1 - Run Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # ⚠️ Empêche le blocage 6h comme précédemment
 
     steps:
       - name: Checkout repository
@@ -20,21 +21,20 @@ jobs:
         with:
           python-version: '3.9'
 
-      # --- DÉBUT DE LA CORRECTION ---
       - name: Cache pip dependencies
         uses: actions/cache@v3
         with:
-          # Le dossier où pip stocke les téléchargements
           path: ~/.cache/pip
-          # Une clé unique pour ce cache. Si requirements.txt change, la clé change.
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          # 🔑 "v2" pour invalider l'ancien cache corrompu (boto3 1.2.0)
+          key: ${{ runner.os }}-pip-v2-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
-      # --- FIN DE LA CORRECTION ---
+            ${{ runner.os }}-pip-v2-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # 🧹 Nettoie les métadonnées corrompues éventuelles
+          pip cache purge || true
           pip install -r requirements.txt
       
       - name: Run Pytest
@@ -44,6 +44,7 @@ jobs:
     name: 2 - Train Model
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -56,23 +57,26 @@ jobs:
         with:
           python-version: '3.9'
 
-      # --- ON AJOUTE LE CACHE ICI AUSSI ---
       - name: Cache pip dependencies
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-v2-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
-      # --- FIN DE LA CORRECTION ---
+            ${{ runner.os }}-pip-v2-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip cache purge || true
           pip install -r requirements.txt
 
       - name: DVC - Pull data
-        run: dvc pull -r myremote || echo "DVC pull failed as expected (no access to local remote), continuing..."
+        run: |
+          git config --global user.email "ci@github.com"
+          git config --global user.name "GitHub Actions"
+          # Timeout pour éviter l'attente infinie si le remote ne répond pas
+          timeout 60 dvc pull -r myremote || echo "⚠️ DVC pull failed, using local data if available"
         env:
           AWS_ACCESS_KEY_ID: "fake-key"
           AWS_SECRET_ACCESS_KEY: "fake-secret"
@@ -80,15 +84,19 @@ jobs:
       - name: Run training script
         run: python src/train.py
         env:
-          MLFLOW_TRACKING_URI: "http://localhost:5000"
+          # 🔧 Correction : localhost n'existe pas dans CI
+          # Option A: Mode fichier local (recommandé pour CI)
+          MLFLOW_TRACKING_URI: "file:///tmp/mlruns"
+          # Option B: Désactiver MLflow si non nécessaire en CI
+          # MLFLOW_DISABLE_AUTO_LOGGING: "true"
 
-  # Le job de déploiement n'a pas besoin d'installer de dépendances, donc pas de cache nécessaire ici
   deploy:
     name: 3 - Deploy Model
     needs: train
     environment: production
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: 'Simulate Deployment'
         run: |
