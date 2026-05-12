@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  AUTHOR: "Nourhene Ben othmen 2ING DS-AI 2.2"
+
 jobs:
   test:
     name: 1 - Run Unit Tests
@@ -14,58 +17,66 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-v2-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-v6-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-v2-
+            ${{ runner.os }}-pip-v6-
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip cache purge || true
           pip install -r requirements.txt
       
       - name: Run Pytest
         id: pytest
         run: |
-          if [ -d "tests" ] && [ -n "$(ls -A tests/*.py 2>/dev/null)" ]; then
-            pytest tests/
+          mkdir -p tests
+          if [ ! -f "tests/test_basic.py" ]; then
+            echo "def test_placeholder(): assert True" > tests/test_basic.py
+          fi
+          pytest tests/ -v
+
+      - name: Check Discord Secret
+        run: |
+          if [ -z "${{ secrets.DISCORD_WEBHOOK_URL }}" ]; then
+            echo "⚠️ Secret DISCORD_WEBHOOK_URL non configuré!"
           else
-            echo "⚠️ No tests found - creating placeholder"
-            mkdir -p tests
-            echo "def test_placeholder(): pass" > tests/test_placeholder.py
-            pytest tests/
+            echo "✅ Secret Discord configuré"
           fi
 
       - name: Notify Discord - Tests Success
-        if: success() && github.event_name == 'push'
+        if: always() && github.event_name == 'push' && success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -d '{"content":"✅ **Tests Unités** - Succès sur `${{ github.ref_name }}`","embeds":[{"color":3066993,"fields":[{"name":"Commit","value":"`${{ github.sha }}`","inline":false},{"name":"Auteur","value":"${{ github.actor }}","inline":true}]}]}' \
-            $DISCORD_WEBHOOK
+          if [ -n "$DISCORD_WEBHOOK" ]; then
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -d "{\"content\":\"✅ **Stage 1/3: Tests Unités** - Validation réussie\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"🌿 Branch\",\"value\":\"${{ github.ref_name }}\",\"inline\":true},{\"name\":\"📌 Commit\",\"value\":\"${{ github.sha }}\",\"inline\":false}]}]}" \
+              "$DISCORD_WEBHOOK"
+          fi
 
       - name: Notify Discord - Tests Failed
-        if: failure() && github.event_name == 'push'
+        if: always() && github.event_name == 'push' && failure()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -d '{"content":"❌ **Tests Unités** - Échec sur `${{ github.ref_name }}` !","embeds":[{"color":15158332,"fields":[{"name":"Commit","value":"`${{ github.sha }}`","inline":false},{"name":"Auteur","value":"${{ github.actor }}","inline":true},{"name":"Action","value":"Vérifiez les logs","inline":true}]}]}' \
-            $DISCORD_WEBHOOK
+          if [ -n "$DISCORD_WEBHOOK" ]; then
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -d "{\"content\":\"❌ **Stage 1/3: Tests Unités** - Échec\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"⚠️ Action\",\"value\":\"Vérifier les logs pytest\",\"inline\":true}]}]}" \
+              "$DISCORD_WEBHOOK"
+          fi
 
   train:
     name: 2 - Train Model
@@ -75,27 +86,24 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0 
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
       - name: Cache pip dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-v2-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-v2-
+          key: ${{ runner.os }}-pip-v6-${{ hashFiles('**/requirements.txt') }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip cache purge || true
           pip install -r requirements.txt
 
       - name: Setup Git
@@ -112,33 +120,20 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID || 'fake-key' }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || 'fake-secret' }}
 
-      - name: Create fallback data for CI
+      - name: Determine Data Source
+        id: data_source
         run: |
-          mkdir -p data/raw
-          cat > data/raw/diabetes.csv << 'EOF'
-          Pregnancies,Glucose,BloodPressure,SkinThickness,Insulin,BMI,DiabetesPedigreeFunction,Age,Outcome
-          6,148,72,35,0,33.6,0.627,50,1
-          1,85,66,29,0,26.6,0.351,31,0
-          8,183,64,0,0,23.3,0.672,32,1
-          1,89,66,23,94,28.1,0.167,21,0
-          0,137,40,35,168,43.1,2.288,33,1
-          5,116,74,0,0,25.6,0.201,30,0
-          3,78,50,32,88,31.0,0.248,26,1
-          10,115,0,0,0,35.3,0.134,29,0
-          2,197,70,45,543,30.5,0.158,53,1
-          8,125,96,0,0,0.0,0.232,54,1
-          EOF
-
-      - name: Patch train.py for CI (bypass DVC)
-        run: |
-          sed -i 's|data_path = dvc.api.get_url(path=['\"'\"']data/raw/diabetes.csv['\"'\"'], repo=['\"'\"'].['\"'\"'])|data_path = \"data/raw/diabetes.csv\"|' src/train.py
-          echo "Vérification du fichier modifié:"
-          grep -n "data_path" src/train.py || echo "data_path non trouvé, vérifiez votre script"
+          if [ "${{ steps.dvc_pull.outcome }}" == "success" ]; then
+            echo "source=DVC S3 ✅" >> $GITHUB_OUTPUT
+          else
+            echo "source=Sklearn Fallback (CI) ⚠️" >> $GITHUB_OUTPUT
+          fi
 
       - name: Run training script
         id: training
         run: python src/train.py
         env:
+          CI: "true"
           MLFLOW_TRACKING_URI: "file:///tmp/mlruns"
 
       - name: Upload artifacts
@@ -149,24 +144,29 @@ jobs:
           retention-days: 5
 
       - name: Notify Discord - Training Success
-        if: success() && github.event_name == 'push'
+        if: always() && github.event_name == 'push' && success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DATA_SRC: ${{ steps.data_source.outputs.source }}
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -d '{"content":"🚀 **Entraînement** - Modèle entraîné avec succès sur `${{ github.ref_name }}` !","embeds":[{"color":3066993,"description":"Le modèle est disponible dans les artefacts MLflow","fields":[{"name":"DVC Status","value":"${{ steps.dvc_pull.outcome == '\''success'\'' && '✅ Données DVC' || '⚠️ Fallback local' }}","inline":true}]}]}' \
-            $DISCORD_WEBHOOK
+          if [ -n "$DISCORD_WEBHOOK" ]; then
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -d "{\"content\":\"🚀 **Stage 2/3: Entraînement** - Modèle entraîné\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"💾 Source\",\"value\":\"$DATA_SRC\",\"inline\":true},{\"name\":\"📁 Artifacts\",\"value\":\"Disponibles dans MLflow\",\"inline\":false}]}]}" \
+              "$DISCORD_WEBHOOK"
+          fi
 
       - name: Notify Discord - Training Failed
-        if: failure() && github.event_name == 'push'
+        if: always() && github.event_name == 'push' && failure()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -d '{"content":"💥 **Entraînement** - Échec sur `${{ github.ref_name }}` !","embeds":[{"color":15158332,"description":"L'\''entraînement a échoué","fields":[{"name":"Erreur","value":"Vérifiez l'\''étape 'Run training script'","inline":true}]}]}' \
-            $DISCORD_WEBHOOK
+          if [ -n "$DISCORD_WEBHOOK" ]; then
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -d "{\"content\":\"💥 **Stage 2/3: Entraînement** - Échec\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"❌ Erreur\",\"value\":\"Échec lors de l'entraînement\",\"inline\":true}]}]}" \
+              "$DISCORD_WEBHOOK"
+          fi
 
   deploy:
     name: 3 - Deploy Model
@@ -184,28 +184,30 @@ jobs:
           path: ./artifacts
 
       - name: Simulate Deployment
-        id: deploy
         run: |
-          echo "🚀 Simulating deployment to production..."
-          ls -la ./artifacts/ || echo "No artifacts found"
-          echo "✅ Model would be deployed here."
+          echo "🚀 Déploiement en production..."
+          echo "✅ Déploiement simulé avec succès"
 
       - name: Notify Discord - Deployment Success
-        if: success()
+        if: always() && success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -d '{"content":"🎉 **Déploiement** - Production mise à jour sur `${{ github.ref_name }}` !","embeds":[{"color":3066993,"fields":[{"name":"Commit","value":"`${{ github.sha }}`","inline":true},{"name":"Status","value":"✅ Déployé","inline":true}]}]}' \
-            $DISCORD_WEBHOOK
+          if [ -n "$DISCORD_WEBHOOK" ]; then
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -d "{\"content\":\"🎉 **Stage 3/3: Déploiement** - Production mise à jour\",\"embeds\":[{\"color\":3066993,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"🌐 Environnement\",\"value\":\"Production\",\"inline\":true},{\"name\":\"✅ Status\",\"value\":\"Déployé avec succès\",\"inline\":true},{\"name\":\"📌 Commit\",\"value\":\"${{ github.sha }}\",\"inline\":false}]}]}" \
+              "$DISCORD_WEBHOOK"
+          fi
 
       - name: Notify Discord - Deployment Failed
-        if: failure()
+        if: always() && failure()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          curl -X POST \
-            -H "Content-Type: application/json" \
-            -d '{"content":"🚨 **Déploiement** - Échec en production !","embeds":[{"color":15158332,"description":"Le déploiement a échoué","fields":[{"name":"Commit","value":"`${{ github.sha }}`","inline":true}]}]}' \
-            $DISCORD_WEBHOOK
+          if [ -n "$DISCORD_WEBHOOK" ]; then
+            curl -X POST \
+              -H "Content-Type: application/json" \
+              -d "{\"content\":\"🚨 **Stage 3/3: Déploiement** - Échec en production\",\"embeds\":[{\"color\":15158332,\"fields\":[{\"name\":\"👤 Auteur\",\"value\":\"${{ env.AUTHOR }}\",\"inline\":true},{\"name\":\"⚠️ Statut\",\"value\":\"Échec critique\",\"inline\":true},{\"name\":\"🔧 Action\",\"value\":\"Intervention immédiate requise\",\"inline\":false}]}]}" \
+              "$DISCORD_WEBHOOK"
+          fi
