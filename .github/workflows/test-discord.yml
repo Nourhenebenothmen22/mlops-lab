@@ -1,0 +1,14 @@
+name: Test Discord
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Webhook
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"content":"🧪 Test de connexion depuis GitHub Actions"}' \
+            "$DISCORD_WEBHOOK"
